@@ -1,6 +1,3 @@
-/**
- * C File for the Free-style Just Intonation app for MatrixOS.
- */
 #include "FSJI.h"
 
 #include "applications/BrightnessControl/BrightnessControl.h"

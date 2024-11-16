@@ -1,6 +1,5 @@
 /**
- * Header for the Free-style Just Intonation app for MatrixOS.
- *
+ * The Free-style Just Intonation app for MatrixOS.
  */
 #pragma once
 
