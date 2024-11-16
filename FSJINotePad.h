@@ -14,6 +14,10 @@
 
 #define MIDI_NOTE_COUNT 128
 
+#define COLOR_ANGULAR_STRETCH_FACTOR 2  // Stretches the center of the spectrum
+#define COLOR_PHASE_OFFSET -0.4         // Shifts the entire spectrum towards purple, away from red
+#define COLOR_RANGE_FACTOR 1.8          // Increases the range of colors viewed
+
 struct FSJINotePadConfig {
   bool velocitySensitive = true;
   uint8_t channel = 0;
@@ -24,6 +28,7 @@ class FSJINotePad : public UIComponent {
  private:
   FSJINotePadConfig* config;
   uint8_t midiNoteTable[8][8];
+  Color** buttonColorCache;
 
  public:
   Dimension dimension;
@@ -53,7 +58,7 @@ class FSJINotePad : public UIComponent {
         }
         else
         {
-          MatrixOS::LED::SetColor(globalPos, Color(0x000000));
+          MatrixOS::LED::SetColor(globalPos, buttonColorCache[x][y]);
         }
       }
     }
@@ -62,6 +67,10 @@ class FSJINotePad : public UIComponent {
 
   virtual bool KeyEvent(Point buttonPos, KeyInfo* keyInfo) {
     uint8_t buttonID = buttonPos.y * dimension.x + buttonPos.x;
+
+    // char outMessage[100];
+    // sprintf(outMessage, "Coordinates: (%d, %d) Color: %06X", 0, 0, (unsigned int)buttonColorCache[0][0].RGB());
+    // MLOGD("FSJI", outMessage);
 
     if (keyInfo->state == PRESSED)
     {
@@ -82,6 +91,8 @@ class FSJINotePad : public UIComponent {
     MLOGD("FSJI", "FSJINotePad Constructor");
     this->dimension = dimension;
     this->config = config;
+
+    GenerateButtonColors(buttonColorCache);
 
     // Zero-indexed root, so to store 1 MIDI note we need a tree of depth 0; to store 2-3 MIDI notes we need a tree of depth 1.
     // 6 when MIDI_NOTE_COUNT is 128.
@@ -108,7 +119,7 @@ class FSJINotePad : public UIComponent {
       // Add MIDI note to table if it fits (Array is zero-indexed, Points here are not!)
       uint8_t x = curNode.C.n - 1;
       uint8_t y = curNode.C.d - 1;
-      if (x < 8 && y < 8)
+      if (x < dimension.x && y < dimension.y)
       {
         midiNoteTable[x][y] = curNode.MIDINote;
         // char outMessage[100];
@@ -143,16 +154,16 @@ class FSJINotePad : public UIComponent {
     }
 
     // Fill in the remaining values
-    for (int i = 0; i < 8; i++)
+    for (int x = 0; x < dimension.x; x++)
     {
-      for (int j = 0; j < 8; j++)
+      for (int y = 0; y < dimension.y; y++)
       {
-        Ratio buttonRatio = Ratio(i + 1, j + 1);
+        Ratio buttonRatio = Ratio(x + 1, y + 1);
 
         // Copy over MIDI note number if the fraction is reducible
-        if (i != buttonRatio.n - 1 || j != buttonRatio.d - 1)
+        if (x != buttonRatio.n - 1 || y != buttonRatio.d - 1)
         {
-          midiNoteTable[i][j] = midiNoteTable[buttonRatio.n - 1][buttonRatio.d - 1];
+          midiNoteTable[x][y] = midiNoteTable[buttonRatio.n - 1][buttonRatio.d - 1];
         }
       }
     }
@@ -160,8 +171,54 @@ class FSJINotePad : public UIComponent {
     activeNotes.reserve(8);
   }
 
+  /**
+   * Generate an array of colors for grid buttons given a pointer to the 2D array to generate it in.
+   * Free the cache with FreeButtonColors.
+   */
+  void GenerateButtonColors(Color**& colorCache) {
+    // Initialize cachedColors to an empty 2D array
+    colorCache = new Color*[dimension.x];
+    for (int i = 0; i < dimension.x; i++)
+    {
+      colorCache[i] = new Color[dimension.y];
+    }
+
+    // Fill out array of cached colors to avoid doing fun (difficult) computation in realtime
+    for (int8_t x = 0; x < dimension.x; x++)
+    {
+      for (int8_t y = 0; y < dimension.y; y++)
+      {
+        Ratio buttonRatio = Ratio(x + 1, y + 1);
+        float floatRatio = (float)buttonRatio.n / (float)buttonRatio.d;
+
+        // Highlight doubled ratios
+        if (buttonRatio.n - 1 < dimension.x / 2 && buttonRatio.d - 1 < dimension.y / 2)
+        {
+          // H, S, and V are 0...1 so we create hue with that range
+          float hue = atan((log2(floatRatio) + COLOR_PHASE_OFFSET) / COLOR_ANGULAR_STRETCH_FACTOR) * COLOR_RANGE_FACTOR / M_PI + 0.5f;
+          colorCache[x][y] = Color::HsvToRgb(hue, 1.0f, 0.5f);
+        }
+        // Other buttons are left dark
+        else
+          colorCache[x][y] = Color(0x000000);
+      }
+    }
+  }
+
+  /**
+   * Frees a cache of colors generated with GenerateColorCache.
+   */
+  void FreeButtonColors(Color**& colorCache) {
+    for (int i = 0; i < dimension.x; i++)
+    {
+      delete[] colorCache[i];
+    }
+    delete[] colorCache;
+  }
+
   ~FSJINotePad() {
     // NO MEMORY LEAKS IN THIS HOUSE
+    FreeButtonColors(buttonColorCache);
     activeNotes.~unordered_set();
   }
 };
