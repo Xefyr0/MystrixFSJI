@@ -15,7 +15,7 @@ class FSJI : public Application {
 
   void Setup() override;
 
-  void PlayView();
+  void ActionMenu();
 };
 
 // Metadata about this application

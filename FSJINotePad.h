@@ -14,6 +14,7 @@ class FSJINotePad : public UIComponent {
   // Set of all active notes. Defined in local space in case UI is moved.
   std::unordered_set<uint8_t> activeNotes;
 
+  virtual Color GetColor() { return Color(0xFFFFFF); }
   virtual Dimension GetSize() { return dimension; }
 
   virtual bool Render(Point origin) {
@@ -23,6 +24,7 @@ class FSJINotePad : public UIComponent {
       {
         // Row-major index of each button
         // Runs 0 to 64, assuming the UI takes up the whole controller
+        // TODO: Change from buttonID to localPos for activeNotes set
         uint8_t buttonID = y * dimension.x + x;
 
         Point localPos = Point(x, y);
