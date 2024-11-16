@@ -48,7 +48,7 @@ void FSJI::ActionMenu() {
 
   // Rotation control and canvas
   UIButton rotateUpBtn;
-  rotateUpBtn.SetName("This does nothing");
+  rotateUpBtn.SetName("Rotate to this side (Default)");
   rotateUpBtn.SetColor(Color(0x00FF00));
   rotateUpBtn.SetSize(Dimension(2, 1));
   rotateUpBtn.OnPress([&]() -> void {});
@@ -74,6 +74,13 @@ void FSJI::ActionMenu() {
   rotateLeftBtn.SetSize(Dimension(1, 2));
   rotateLeftBtn.OnPress([&]() -> void { MatrixOS::SYS::Rotate(LEFT); });
   actionMenu.AddUIComponent(rotateLeftBtn, Point(2, 3));
+
+  // System Settings button
+  UIButton systemSettingBtn;
+  systemSettingBtn.SetName("System Settings");
+  systemSettingBtn.SetColor(Color(0xFFFFFF));
+  systemSettingBtn.OnPress([&]() -> void { MatrixOS::SYS::OpenSetting(); });
+  actionMenu.AddUIComponent(systemSettingBtn, Point(7, 7));
 
   actionMenu.SetKeyEventHandler([&](KeyEvent* keyEvent) -> bool {
     if (keyEvent->id == FUNCTION_KEY)
