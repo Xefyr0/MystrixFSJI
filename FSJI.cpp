@@ -7,9 +7,23 @@
 
 void FSJI::Setup() {
   MLOGD("FSJI", "FSJI Setup");
+
+  // Set up / Load configs --------------------------------------------------------------------------
+
+  // Load From Non-volatile Storage if config versions match; else make new clean config
+  if (nvsVersion == (uint32_t)MYSTRIX_FSJI_VERSION)
+  {
+    MatrixOS::NVS::GetVariable(FSJI_CONFIGS_HASH, notePadConfig, sizeof(FSJINotePadConfig));
+  }
+  else
+  {
+    MatrixOS::NVS::SetVariable(FSJI_CONFIGS_HASH, notePadConfig, sizeof(FSJINotePadConfig));
+  }
+
+  // Set up the Note View UI ---------------------------------------------------------------------
   UI noteView("Note view", Color(0xFFFFFF));
 
-  FSJINotePad notePad(Dimension(8, 8));
+  FSJINotePad notePad(Dimension(8, 8), notePadConfig);
   noteView.AddUIComponent(notePad, Point(0, 0));
 
   noteView.SetKeyEventHandler([&](KeyEvent* keyEvent) -> bool {
@@ -75,6 +89,22 @@ void FSJI::ActionMenu() {
   rotateLeftBtn.OnPress([&]() -> void { MatrixOS::SYS::Rotate(LEFT); });
   actionMenu.AddUIComponent(rotateLeftBtn, Point(2, 3));
 
+  UIButton channelSelectorBtn;
+  channelSelectorBtn.SetName("Channel Selector");
+  channelSelectorBtn.SetColor(Color(0x60FF00));
+  channelSelectorBtn.OnPress([&]() -> void { ChannelSelector(); });
+  actionMenu.AddUIComponent(channelSelectorBtn, Point(7, 5));
+
+  UIButton velocitySensitiveToggle;
+  velocitySensitiveToggle.SetName("Velocity Sensitive");
+  velocitySensitiveToggle.SetColorFunc([&]() -> Color { return Color(0x00FFB0).DimIfNot(notePadConfig->velocitySensitive); });
+  velocitySensitiveToggle.OnPress([&]() -> void { notePadConfig->velocitySensitive = !notePadConfig->velocitySensitive; });
+  velocitySensitiveToggle.OnHold([&]() -> void {
+    MatrixOS::UIInterface::TextScroll(velocitySensitiveToggle.GetName() + " " + (notePadConfig->velocitySensitive ? "On" : "Off"), velocitySensitiveToggle.GetColor());
+  });
+  velocitySensitiveToggle.SetEnabled(Device::KeyPad::velocity_sensitivity);
+  actionMenu.AddUIComponent(velocitySensitiveToggle, Point(6, 7));
+
   // System Settings button
   UIButton systemSettingBtn;
   systemSettingBtn.SetName("System Settings");
@@ -87,10 +117,12 @@ void FSJI::ActionMenu() {
     {
       if (keyEvent->info.state == HOLD)
       {
+        MatrixOS::NVS::SetVariable(FSJI_CONFIGS_HASH, notePadConfig, sizeof(FSJINotePadConfig));
         Exit();
       }
       else if (keyEvent->info.state == RELEASED)
       {
+        MatrixOS::NVS::SetVariable(FSJI_CONFIGS_HASH, notePadConfig, sizeof(FSJINotePadConfig));
         actionMenu.Exit();
       }
       return true;  // Block UI from to do anything with FN, basically this function control the life cycle of the UI
@@ -100,4 +132,22 @@ void FSJI::ActionMenu() {
   actionMenu.Start();
 
   // Exit();  // This should never be reached
+}
+
+void FSJI::ChannelSelector() {
+  UI channelSelector("Channel Selector", Color(0x60FF00), false);
+
+  int32_t offsettedChannel = notePadConfig->channel + 1;
+  UI4pxNumber numDisplay(Color(0x60FF00), 2, &offsettedChannel, Color(0xFFFF00), 1);
+  channelSelector.AddUIComponent(numDisplay, Point(1, 0));
+
+  UISelector channelInput(Dimension(8, 2), "Channel", Color(0x60FF00), 16, (uint16_t*)&notePadConfig->channel, [&](uint16_t val) -> void { offsettedChannel = val + 1; });
+
+  channelSelector.AddUIComponent(channelInput, Point(0, 6));
+
+  channelSelector.Start();
+}
+
+FSJI::~FSJI() {
+  free(notePadConfig);
 }

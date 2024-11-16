@@ -14,8 +14,15 @@
 
 #define MIDI_NOTE_COUNT 128
 
+struct FSJINotePadConfig {
+  bool velocitySensitive = true;
+  uint8_t channel = 0;
+  EMidiPortID port = MIDI_PORT_USB;
+};
+
 class FSJINotePad : public UIComponent {
  private:
+  FSJINotePadConfig* config;
   uint8_t midiNoteTable[8][8];
 
  public:
@@ -58,20 +65,23 @@ class FSJINotePad : public UIComponent {
 
     if (keyInfo->state == PRESSED)
     {
-      MatrixOS::MIDI::Send(MidiPacket(MIDI_PORT_ALL, NoteOn, 0, midiNoteTable[buttonPos.x][buttonPos.y], keyInfo->velocity.to7bits()));
+      MatrixOS::MIDI::Send(MidiPacket(config->port, NoteOn, config->channel, midiNoteTable[buttonPos.x][buttonPos.y],
+                                      config->velocitySensitive ? keyInfo->velocity.to7bits() : 0x7F));
       activeNotes.emplace(buttonID);
     }
     else if (keyInfo->state == RELEASED)
     {
-      MatrixOS::MIDI::Send(MidiPacket(MIDI_PORT_ALL, NoteOff, 0, midiNoteTable[buttonPos.x][buttonPos.y], keyInfo->velocity.to7bits()));
+      MatrixOS::MIDI::Send(MidiPacket(config->port, NoteOff, config->channel, midiNoteTable[buttonPos.x][buttonPos.y],
+                                      config->velocitySensitive ? keyInfo->velocity.to7bits() : 0x7F));
       activeNotes.erase(buttonID);
     }
     return true;
   }
 
-  FSJINotePad(Dimension dimension) {
+  FSJINotePad(Dimension dimension, FSJINotePadConfig* config) {
     MLOGD("FSJI", "FSJINotePad Constructor");
     this->dimension = dimension;
+    this->config = config;
 
     // Zero-indexed root, so to store 1 MIDI note we need a tree of depth 0; to store 2-3 MIDI notes we need a tree of depth 1.
     // 6 when MIDI_NOTE_COUNT is 128.
