@@ -65,5 +65,9 @@ class Ratio {
 
   operator uint32_t() { return (uint32_t)(n << 16 & d); }
 
+  operator float() { return (float)n / (float)d; }
+
+  operator double() { return (double)n / (double)d; }
+
   static Ratio Invalid() { return Ratio(0, 0); }
 };

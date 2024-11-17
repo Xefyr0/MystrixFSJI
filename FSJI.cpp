@@ -44,7 +44,6 @@ void FSJI::Setup() {
 }
 
 void FSJI::ActionMenu() {
-  MLOGD("FSJI", "FSJI Action Menu Method");
 
   // Set up the Action Menu UI ---------------------------------------------------------------------
   UI actionMenu("Action Menu", Color(0x00FFFF));

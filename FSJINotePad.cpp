@@ -1,5 +1,9 @@
 #include "FSJINotePad.h"
 
+Ratio FSJINotePad::NoteRatioFromButtonPos(Point buttonPos) {
+  return Ratio(buttonPos.x + 1, buttonPos.y + 1);
+}
+
 bool FSJINotePad::Render(Point origin) {
   for (int8_t y = 0; y < dimension.y; y++)
   {
@@ -28,18 +32,58 @@ bool FSJINotePad::Render(Point origin) {
 bool FSJINotePad::KeyEvent(Point buttonPos, KeyInfo* keyInfo) {
   uint8_t buttonID = buttonPos.y * dimension.x + buttonPos.x;
 
-  // char outMessage[100];
-  // sprintf(outMessage, "Coordinates: (%d, %d) Color: %06X", 0, 0, (unsigned int)buttonColorCache[0][0].RGB());
-  // MLOGD("FSJI", outMessage);
-
   if (keyInfo->state == PRESSED)
   {
+    /*
+     * In its current state, large amounts of note on/off events overload the processor/some buffer,
+     * Causing some of the events to drop & be lost.
+     * This is why some of the buttons are left "on" - The note off message is never processed.
+     * To remedy this, I should attempt to reduce instantiation/allocation inside the KeyEvent method (event thread).
+     *
+     * It may be worth caching all 64 types of sysex messages to be sent out verbatim as needed
+     * to eliminate the need to calculate their parameters on the fly, just like with colors.
+     */
+
+    // convert ratio to frequency
+    double noteFreq = TONIC_FREQ * (double)NoteRatioFromButtonPos(buttonPos);
+    // convert frequency to semitones above MIDI note 0 (C-1)
+    double MIDIVALU = 12 * log2(noteFreq / CONCERT_A_FREQ) + CONCERT_A_MIDI_NOTE;
+    // extract semitone, big, & small offsets from float semitones
+    uint8_t semitones = (uint8_t)floor(MIDIVALU);
+    MIDIVALU -= 1 * semitones;
+    uint8_t MSB = floor(MIDIVALU / MSBConversion);
+    MIDIVALU -= MSBConversion * MSB;
+    uint8_t LSB = floor(MIDIVALU / LSBConversion);
+    MIDIVALU -= LSBConversion * LSB;
+
+    char message[100];
+    sprintf(message, "\nMSB: %d\nLSB: %d\nMIDIVALU: %lf", MSB, LSB, MIDIVALU);
+    MLOGD("FSJI", message);
+
+    // Construct for a real-time single-note retune
+    uint8_t miData[] = {MIDIv1_SYSEX_START,
+                        MIDIv1_UNIVERSAL_REALTIME_ID,
+                        0x00,  // id
+                        0x08,
+                        0x02,
+                        0x00,  // tt
+                        0x01,  // ll
+                        midiNoteTable[buttonPos.x][buttonPos.y],
+                        semitones,
+                        MSB,
+                        LSB,
+                        MIDIv1_SYSEX_END};
+
+    // Single-note retune SysEx
+    MatrixOS::MIDI::SendSysEx(config->port, sizeof(miData), miData, false);
+    // Note On
     MatrixOS::MIDI::Send(MidiPacket(config->port, NoteOn, config->channel, midiNoteTable[buttonPos.x][buttonPos.y],
                                     config->velocitySensitive ? keyInfo->velocity.to7bits() : 0x7F));
     activeNotes.emplace(buttonID);
   }
   else if (keyInfo->state == RELEASED)
   {
+    // Note Off
     MatrixOS::MIDI::Send(MidiPacket(config->port, NoteOff, config->channel, midiNoteTable[buttonPos.x][buttonPos.y],
                                     config->velocitySensitive ? keyInfo->velocity.to7bits() : 0x7F));
     activeNotes.erase(buttonID);
@@ -86,7 +130,6 @@ void FSJINotePad::FreeButtonColors(Color**& colorCache) {
 }
 
 FSJINotePad::FSJINotePad(Dimension dimension, FSJINotePadConfig* config) {
-  MLOGD("FSJI", "FSJINotePad Constructor");
   this->dimension = dimension;
   this->config = config;
 
@@ -118,12 +161,7 @@ FSJINotePad::FSJINotePad(Dimension dimension, FSJINotePadConfig* config) {
     uint8_t x = curNode.C.n - 1;
     uint8_t y = curNode.C.d - 1;
     if (x < dimension.x && y < dimension.y)
-    {
       midiNoteTable[x][y] = curNode.MIDINote;
-      // char outMessage[100];
-      // sprintf(outMessage, "Coordinates: (%d, %d) MIDI note: %d", x, y, curNode.MIDINote);
-      // MLOGD("FSJI", outMessage);
-    }
 
     // Don't generate any more children if at or beyond maximum depth
     if (curNode.depth >= traverseDepth)
@@ -156,7 +194,7 @@ FSJINotePad::FSJINotePad(Dimension dimension, FSJINotePadConfig* config) {
   {
     for (int y = 0; y < dimension.y; y++)
     {
-      Ratio buttonRatio = Ratio(x + 1, y + 1);
+      Ratio buttonRatio = NoteRatioFromButtonPos(Point(x, y));
 
       // Copy over MIDI note number if the fraction is reducible
       if (x != buttonRatio.n - 1 || y != buttonRatio.d - 1)
@@ -166,6 +204,7 @@ FSJINotePad::FSJINotePad(Dimension dimension, FSJINotePadConfig* config) {
     }
   }
 
+  // Reserve space for 8 active notes
   activeNotes.reserve(8);
 }
 
