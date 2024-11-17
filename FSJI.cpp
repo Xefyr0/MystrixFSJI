@@ -126,8 +126,6 @@ void FSJI::ActionMenu() {
     return false;
   });
   actionMenu.Start();
-
-  // Exit();  // This should never be reached
 }
 
 void FSJI::ChannelSelector() {

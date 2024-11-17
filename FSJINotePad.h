@@ -32,6 +32,7 @@ struct FSJINotePadConfig {
 
 class FSJINotePad : public UIComponent {
  private:
+  bool temp = false;
   // Semitones the MSB of the single-note tuning sysex offsets
   const double MSBConversion = 1.0L / (1 << 7);
   // Semitones the LSB of the single-note tuning sysex offsets
@@ -39,7 +40,8 @@ class FSJINotePad : public UIComponent {
 
   FSJINotePadConfig* config;
   uint8_t midiNoteTable[8][8];
-  Color** buttonColorCache;
+  uint8_t midiSysExTable[8][8][12];
+  Color buttonColorTable[8][8];
 
   // Set of all active notes. Defined in local space.
   // Must be uint8_t due to Point not having the functions necessary to be used in an unordered set.
@@ -57,15 +59,17 @@ class FSJINotePad : public UIComponent {
   virtual bool KeyEvent(Point buttonPos, KeyInfo* keyInfo);
 
   /**
-   * Generate an array of colors for grid buttons given a pointer to the 2D array to generate it in.
-   * Free the cache with FreeButtonColors.
+   * Generate an table of MIDI note numbers corresponding to each grid button.
    */
-  void GenerateButtonColors(Color**& colorCache);
-
+  void GenerateMIDINoteTable(uint8_t (&midiNoteTable)[8][8]);
   /**
-   * Frees a cache of colors generated with GenerateColorCache.
+   * Generate an table of MIDI SysEx messages corresponding to each grid button.
    */
-  void FreeButtonColors(Color**& colorCache);
+  void GenerateMIDISysExTable(uint8_t (&midiSysExTable)[8][8][12]);
+  /**
+   * Generate a table of default colors corresponding to each grid button.
+   */
+  void GenerateButtonColors(Color (&colorCache)[8][8]);
 
   FSJINotePad(Dimension dimension, FSJINotePadConfig* config);
 
