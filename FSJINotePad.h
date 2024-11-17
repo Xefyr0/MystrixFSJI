@@ -32,10 +32,9 @@ struct FSJINotePadConfig {
 
 class FSJINotePad : public UIComponent {
  private:
-  bool temp = false;
-  // Semitones the MSB of the single-note tuning sysex offsets
+  // Semitones per unit of the MSB in the single-note tuning syses
   const double MSBConversion = 1.0L / (1 << 7);
-  // Semitones the LSB of the single-note tuning sysex offsets
+  // Semitones per unit of the LSB in the single-note tuning sysex
   const double LSBConversion = 1.0L / (1 << 14);
 
   FSJINotePadConfig* config;
@@ -46,8 +45,6 @@ class FSJINotePad : public UIComponent {
   // Set of all active notes. Defined in local space.
   // Must be uint8_t due to Point not having the functions necessary to be used in an unordered set.
   std::unordered_set<uint8_t> activeNotes;
-
-  Ratio NoteRatioFromButtonPos(Point buttonPos);
 
  public:
   Dimension dimension;
@@ -60,6 +57,7 @@ class FSJINotePad : public UIComponent {
 
   /**
    * Generate an table of MIDI note numbers corresponding to each grid button.
+   * Uses Stern-Brocot tree to help ordering the rational numbers represented by each button on the grid
    */
   void GenerateMIDINoteTable(uint8_t (&midiNoteTable)[8][8]);
   /**
@@ -69,7 +67,7 @@ class FSJINotePad : public UIComponent {
   /**
    * Generate a table of default colors corresponding to each grid button.
    */
-  void GenerateButtonColors(Color (&colorCache)[8][8]);
+  void GenerateButtonColors(Color (&buttonColorTable)[8][8]);
 
   FSJINotePad(Dimension dimension, FSJINotePadConfig* config);
 

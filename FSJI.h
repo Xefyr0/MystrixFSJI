@@ -21,6 +21,7 @@ class FSJI : public Application {
 
   void Setup() override;
 
+  void NoteView();
   void ActionMenu();
   void ChannelSelector();
 

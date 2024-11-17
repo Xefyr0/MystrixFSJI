@@ -1,9 +1,5 @@
 #include "FSJINotePad.h"
 
-Ratio FSJINotePad::NoteRatioFromButtonPos(Point buttonPos) {
-  return Ratio(buttonPos.x + 1, buttonPos.y + 1);
-}
-
 bool FSJINotePad::Render(Point origin) {
   for (int8_t y = 0; y < dimension.y; y++)
   {
@@ -60,6 +56,7 @@ void FSJINotePad::GenerateMIDINoteTable(uint8_t (&midiNoteTable)[8][8]) {
   // 6 when MIDI_NOTE_COUNT is 128.
   const uint8_t traverseDepth = floor(log(MIDI_NOTE_COUNT) / log(2));
 
+  // Struct of information necessary for a node to generate its two children.
   struct SternBrocotGeneratorInfo {
     Ratio L;
     Ratio C;
@@ -68,9 +65,10 @@ void FSJINotePad::GenerateMIDINoteTable(uint8_t (&midiNoteTable)[8][8]) {
     uint8_t MIDINote;
   };
 
-  // Generate MIDI notes using Stern-Brocot tree to help ordering the rational number representations of all the irreducible points on the grid
+  // Queue of "edge" nodes for the depth-first search(generation)
   queue<SternBrocotGeneratorInfo> SBTreeLeaves;
 
+  // Start the search with the root node
   SBTreeLeaves.push(SternBrocotGeneratorInfo(Ratio(0, 1), Ratio(1, 1), Ratio(1, 0), 0, 64));
 
   while (!SBTreeLeaves.empty())
@@ -78,7 +76,7 @@ void FSJINotePad::GenerateMIDINoteTable(uint8_t (&midiNoteTable)[8][8]) {
     // Get another node from the list of leaves
     SternBrocotGeneratorInfo curNode = SBTreeLeaves.front();
 
-    // Add MIDI note to table if it fits (Array is zero-indexed, Points here are not!)
+    // Add MIDI note to table if it fits
     uint8_t x = curNode.C.n - 1;
     uint8_t y = curNode.C.d - 1;
     if (x < dimension.x && y < dimension.y)
@@ -115,7 +113,7 @@ void FSJINotePad::GenerateMIDINoteTable(uint8_t (&midiNoteTable)[8][8]) {
   {
     for (int y = 0; y < dimension.y; y++)
     {
-      Ratio buttonRatio = NoteRatioFromButtonPos(Point(x, y));
+      Ratio buttonRatio = Ratio(x + 1, y + 1);
 
       // Copy over MIDI note number if the fraction is reducible
       if (x != buttonRatio.n - 1 || y != buttonRatio.d - 1)
@@ -165,8 +163,8 @@ void FSJINotePad::GenerateMIDISysExTable(uint8_t (&midiSysExTable)[8][8][12]) {
   }
 }
 
-void FSJINotePad::GenerateButtonColors(Color (&colorCache)[8][8]) {
-  // Fill out array of cached colors to avoid doing fun (difficult) computation in realtime
+void FSJINotePad::GenerateButtonColors(Color (&buttonColorTable)[8][8]) {
+  // Fill out array of cached colors to avoid repeating hefty computations each frame
   for (int8_t x = 0; x < dimension.x; x++)
   {
     for (int8_t y = 0; y < dimension.y; y++)
@@ -179,11 +177,11 @@ void FSJINotePad::GenerateButtonColors(Color (&colorCache)[8][8]) {
       {
         // H, S, and V are 0...1 so we create hue with that range
         float hue = atan((log2(floatRatio) + COLOR_PHASE_OFFSET) / COLOR_ANGULAR_STRETCH_FACTOR) * COLOR_RANGE_FACTOR / M_PI + 0.5f;
-        colorCache[x][y] = Color::HsvToRgb(hue, 1.0f, 0.5f);
+        buttonColorTable[x][y] = Color::HsvToRgb(hue, 1.0f, 0.5f);
       }
       // Other buttons are left dark
       else
-        colorCache[x][y] = Color(0x000000);
+        buttonColorTable[x][y] = Color(0x000000);
     }
   }
 }

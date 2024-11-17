@@ -3,11 +3,7 @@
 #include "applications/BrightnessControl/BrightnessControl.h"
 
 void FSJI::Setup() {
-  MLOGD("FSJI", "FSJI Setup");
-
-  // Set up / Load configs --------------------------------------------------------------------------
-
-  // Load From Non-volatile Storage if config versions match; else make new clean config
+  // Load config from non-volatile storage if config versions match
   if (nvsVersion == (uint32_t)MYSTRIX_FSJI_VERSION)
   {
     MatrixOS::NVS::GetVariable(FSJI_CONFIGS_HASH, notePadConfig, sizeof(FSJINotePadConfig));
@@ -17,12 +13,21 @@ void FSJI::Setup() {
     MatrixOS::NVS::SetVariable(FSJI_CONFIGS_HASH, notePadConfig, sizeof(FSJINotePadConfig));
   }
 
+  // Start the app in the NoteView UI
+  NoteView();
+
+  Exit();  // This should never be reached
+}
+
+void FSJI::NoteView() {
   // Set up the Note View UI ---------------------------------------------------------------------
-  UI noteView("Note view", Color(0xFFFFFF));
+  UI noteView("Note View", Color(0xAAAAAA));
 
   FSJINotePad notePad(Dimension(8, 8), notePadConfig);
   noteView.AddUIComponent(notePad, Point(0, 0));
 
+  // Enter the Action Menu if the fn key is pressed.
+  // Exit the application if the fn key is held.
   noteView.SetKeyEventHandler([&](KeyEvent* keyEvent) -> bool {
     if (keyEvent->id == FUNCTION_KEY)
     {
@@ -38,9 +43,9 @@ void FSJI::Setup() {
     }
     return false;
   });
-  noteView.Start();
 
-  Exit();  // This should never be reached
+  // The NoteView UIComponent is now fully set up. Let the UI runtime take over from here.
+  noteView.Start();
 }
 
 void FSJI::ActionMenu() {
@@ -48,6 +53,7 @@ void FSJI::ActionMenu() {
   // Set up the Action Menu UI ---------------------------------------------------------------------
   UI actionMenu("Action Menu", Color(0x00FFFF));
 
+  // Brightness control
   UIButton brightnessBtn;
   brightnessBtn.SetName("Brightness");
   brightnessBtn.SetColor(Color(0xFFFFFF));
@@ -56,7 +62,7 @@ void FSJI::ActionMenu() {
   brightnessBtn.OnHold([&]() -> void { BrightnessControl().Start(); });
   actionMenu.AddUIComponent(brightnessBtn, Point(3, 3));
 
-  // Rotation control and canvas
+  // Rotation control
   UIButton rotateUpBtn;
   rotateUpBtn.SetName("Rotate to this side (Default)");
   rotateUpBtn.SetColor(Color(0x00FF00));
@@ -85,12 +91,14 @@ void FSJI::ActionMenu() {
   rotateLeftBtn.OnPress([&]() -> void { MatrixOS::SYS::Rotate(LEFT); });
   actionMenu.AddUIComponent(rotateLeftBtn, Point(2, 3));
 
+  // MIDI channel selector
   UIButton channelSelectorBtn;
   channelSelectorBtn.SetName("Channel Selector");
   channelSelectorBtn.SetColor(Color(0x60FF00));
   channelSelectorBtn.OnPress([&]() -> void { ChannelSelector(); });
   actionMenu.AddUIComponent(channelSelectorBtn, Point(7, 5));
 
+  // MIDI velocity sensitivity toggle
   UIButton velocitySensitiveToggle;
   velocitySensitiveToggle.SetName("Velocity Sensitive");
   velocitySensitiveToggle.SetColorFunc([&]() -> Color { return Color(0x00FFB0).DimIfNot(notePadConfig->velocitySensitive); });
@@ -108,6 +116,8 @@ void FSJI::ActionMenu() {
   systemSettingBtn.OnPress([&]() -> void { MatrixOS::SYS::OpenSetting(); });
   actionMenu.AddUIComponent(systemSettingBtn, Point(7, 7));
 
+  // Exit the Action Menu if the fn key is pressed.
+  // Exit the application if the fn key is held.
   actionMenu.SetKeyEventHandler([&](KeyEvent* keyEvent) -> bool {
     if (keyEvent->id == FUNCTION_KEY)
     {
@@ -125,10 +135,13 @@ void FSJI::ActionMenu() {
     }
     return false;
   });
+
+  // The Action Menu is now fully set up. Let the UI runtime take over from here.
   actionMenu.Start();
 }
 
 void FSJI::ChannelSelector() {
+  // Set up the Channel Selector UI ---------------------------------------------------------------------
   UI channelSelector("Channel Selector", Color(0x60FF00), false);
 
   int32_t offsettedChannel = notePadConfig->channel + 1;
@@ -139,6 +152,7 @@ void FSJI::ChannelSelector() {
 
   channelSelector.AddUIComponent(channelInput, Point(0, 6));
 
+  // The MIDI Channel Selector UIComponent is now fully set up. Let the UI runtime take over from here.
   channelSelector.Start();
 }
 
